@@ -1,7 +1,7 @@
 <template>
   <main>
     <form @submit.prevent="null" class="date-input-section">
-      <DateInput />
+      <DateInput v-model="date" />
       <div>
         <button type="submit">Submit</button>
       </div>
@@ -10,7 +10,10 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import DateInput from './components/DateInput.vue'
+
+const date = ref<string>('')
 </script>
 
 <style scoped>

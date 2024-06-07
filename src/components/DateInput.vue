@@ -1,8 +1,9 @@
 <template>
   <label class="input-wrapper">
-    <!-- inplement native validation with pattern since no 3rd party libs allowed -->
+    <!-- native validation with pattern since no 3rd party libs allowed -->
     <input
-      v-model="value"
+      :class="{ invalid: dateIsInvalid }"
+      v-model="inputModel"
       :pattern="inputPattern"
       :placeholder="inputFormat"
       @beforeinput="onBeforeInput"
@@ -16,15 +17,34 @@ import dayjs from 'dayjs'
 import customParseFormat from 'dayjs/plugin/customParseFormat'
 dayjs.extend(customParseFormat)
 
+interface Props {
+  modelValue: string
+}
+interface Emits {
+  (e: 'update:modelValue', value: string): void
+}
+const props = defineProps<Props>()
+const emits = defineEmits<Emits>()
+
 type DateFormat = 'DD/MM/YYYY' | 'MM/DD/YYYY'
 const inputPattern = ref<string>(`^([0-9]{2})/([0-9]{2})/([0-9]{4})$`)
 
-const value = ref<string>('')
+const inputModel = computed({
+  get() {
+    return dayjs(props.modelValue, recognizedDateFormats, true).format(inputFormat.value)
+  },
+  set(value: string) {
+    emits('update:modelValue', value)
+  }
+})
 const locale = ref<string>('en-US')
 const inputFormat = computed<DateFormat>(() => {
   return locale.value.toLowerCase() === 'en-us' ? 'MM/DD/YYYY' : 'DD/MM/YYYY'
 })
 const recognizedDateFormats = ['MM/DD/YYYY', 'DD/MM/YYYY']
+const dateIsInvalid = computed(
+  () => !!inputModel.value && !dayjs(inputModel.value, recognizedDateFormats, true).isValid()
+)
 
 function onBeforeInput(this: HTMLInputElement, evt: Event) {
   if (!evt.target || !(evt instanceof InputEvent)) return
@@ -72,6 +92,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* no sass to reduce dependencies of assignment since styling is minimal */
 .input-wrapper {
   width: 120px;
   height: 40px;
@@ -88,7 +109,8 @@ onMounted(() => {
   outline: none;
   border: none;
 }
-input:invalid {
+input:invalid,
+input.invalid {
   border: 1px solid red;
 }
 </style>
