@@ -1,8 +1,9 @@
 <template>
   <label class="input-wrapper">
+    <!-- inplement native validation with pattern since no 3rd party libs allowed -->
     <input
       v-model="value"
-      :pattern="String(inputPattern)"
+      :pattern="inputPattern"
       :placeholder="inputFormat"
       @beforeinput="onBeforeInput"
     />
@@ -11,22 +12,22 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import dayjs from 'dayjs'
+import customParseFormat from 'dayjs/plugin/customParseFormat'
+dayjs.extend(customParseFormat)
 
-type DateFormat = 'DD-MM-YYYY' | 'MM-DD-YYYY'
-const inputPattern = ref<RegExp>(
-  /^(?:(?:(?:0[13578]|1[02])(\/)31)\1|(?:(?:0[1,3-9]|1[0-2])(\/)(?:29|30)\2))(?:(?:19|[2-9]\d)\d{2})$|^(?:02(\/)29\3(?:(?:(?:19|20)(?:[02468][048]|[13579][26]))))$|^(?:(?:0[1-9])|(?:1[0-2]))(\/)(?:0[1-9]|1\d|2[0-8])\4(?:(?:19|[0-9]\d)?\d{2})$/
-)
+type DateFormat = 'DD/MM/YYYY' | 'MM/DD/YYYY'
+const inputPattern = ref<string>(`^([0-9]{2})/([0-9]{2})/([0-9]{4})$`)
 
 const value = ref<string>('')
 const locale = ref<string>('en-US')
 const inputFormat = computed<DateFormat>(() => {
-  return locale.value.toLowerCase() === 'en-us' ? 'MM-DD-YYYY' : 'DD-MM-YYYY'
+  return locale.value.toLowerCase() === 'en-us' ? 'MM/DD/YYYY' : 'DD/MM/YYYY'
 })
+const recognizedDateFormats = ['MM/DD/YYYY', 'DD/MM/YYYY']
 
 function onBeforeInput(this: HTMLInputElement, evt: Event) {
   if (!evt.target || !(evt instanceof InputEvent)) return
-  console.log('data', evt.data)
-
   assertTarget(evt.target)
   const rawNewValue =
     evt.target.value.substring(0, evt.target.selectionStart ?? undefined) +
@@ -38,9 +39,16 @@ function onBeforeInput(this: HTMLInputElement, evt: Event) {
       ? rawNewValue
       : rawNewValue.substring(0, deletedCharIndex) + rawNewValue.substring(deletedCharIndex + 1)
   )
-  console.log(cleanedValue, '  ', deletedCharIndex)
   evt.preventDefault()
-  evt.target.value = cleanedValue
+
+  // TODO integrate date library for smart date parsing & formatting (Intl native library can output locale-specific formats accurately, but can only parse date objects not strings)
+  // TODO done
+
+  const possiblyValidDate = dayjs(cleanedValue, recognizedDateFormats, true)
+  console.log('parsed', possiblyValidDate)
+  evt.target.value = possiblyValidDate?.isValid()
+    ? possiblyValidDate.format(inputFormat.value)
+    : cleanedValue
   evt.target.dispatchEvent(new InputEvent('input'))
 }
 
@@ -72,11 +80,15 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   align-items: center;
+  padding: 5px;
 }
 .input-wrapper input {
   width: 100%;
   height: 100%;
   outline: none;
   border: none;
+}
+input:invalid {
+  border: 1px solid red;
 }
 </style>
