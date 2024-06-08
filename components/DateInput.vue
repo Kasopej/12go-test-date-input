@@ -128,6 +128,11 @@ onMounted(() => {
   // replace default locale with actual client locale
   locale.value = navigator.language
 })
+
+defineExpose({
+  // expose non-writable computed for outside checking
+  dateIsInvalid
+})
 </script>
 
 <style scoped>
