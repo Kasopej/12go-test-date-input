@@ -1,20 +1,26 @@
 <template>
   <label class="input-wrapper">
+    Enter date:
     <!-- native validation with pattern since no 3rd party libs allowed -->
     <input
+      ref="inputElement"
       :class="{ invalid: dateIsInvalid }"
       v-model="inputModel"
       :pattern="inputPattern"
       :placeholder="inputFormat"
+      data-input-slot="_"
+      data-error=""
       @beforeinput="onBeforeInput"
     />
+    <span class="mask-text">{{ inputFormat }}</span>
   </label>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import customParseFormat from 'dayjs/plugin/customParseFormat'
+import { assertTarget } from '@/utils'
 dayjs.extend(customParseFormat)
 
 interface Props {
@@ -25,19 +31,28 @@ interface Emits {
 }
 const props = defineProps<Props>()
 const emits = defineEmits<Emits>()
+const inputElement = ref<HTMLInputElement | null>(null)
 
 type DateFormat = 'DD/MM/YYYY' | 'MM/DD/YYYY'
 const inputPattern = ref<string>(`^([0-9]{2})/([0-9]{2})/([0-9]{4})$`)
 
 const inputModel = computed({
   get() {
-    return dayjs(props.modelValue, recognizedDateFormats, true).format(inputFormat.value)
+    const possiblyValidReceivedValue = dayjs(
+      props.modelValue || inputMask,
+      recognizedDateFormats,
+      true
+    )
+    return possiblyValidReceivedValue.isValid()
+      ? possiblyValidReceivedValue.format(inputFormat.value)
+      : props.modelValue || inputMask
   },
   set(value: string) {
     emits('update:modelValue', value)
   }
 })
 const locale = ref<string>('en-US')
+const inputMask = '__/__/____'
 const inputFormat = computed<DateFormat>(() => {
   return locale.value.toLowerCase() === 'en-us' ? 'MM/DD/YYYY' : 'DD/MM/YYYY'
 })
@@ -45,48 +60,72 @@ const recognizedDateFormats = ['MM/DD/YYYY', 'DD/MM/YYYY']
 const dateIsInvalid = computed(
   () => !!inputModel.value && !dayjs(inputModel.value, recognizedDateFormats, true).isValid()
 )
+watch(dateIsInvalid, (invalid) => {
+  // here we use data attributes.. will be used by parent form for validation
+  if (inputElement.value) inputElement.value.dataset.error = invalid ? 'date not valid' : ''
+})
 
 function onBeforeInput(this: HTMLInputElement, evt: Event) {
   if (!evt.target || !(evt instanceof InputEvent)) return
-  assertTarget(evt.target)
-  const rawNewValue =
-    evt.target.value.substring(0, evt.target.selectionStart ?? undefined) +
-    (evt.data ?? '') +
-    evt.target.value.substring(evt.target.selectionEnd ?? -1)
-  const deletedCharIndex = !evt.data && evt.target.selectionEnd ? evt.target.selectionEnd - 1 : -1
-  const cleanedValue = cleanInput(
-    deletedCharIndex === -1
-      ? rawNewValue
-      : rawNewValue.substring(0, deletedCharIndex) + rawNewValue.substring(deletedCharIndex + 1)
-  )
+  assertTarget(evt, HTMLInputElement)
+
+  const cursorStart = Number(evt.target.selectionStart)
+  const cursorEnd = Number(evt.target.selectionEnd)
+
+  // break down the input for formatting
+  const inputSlotPattern = evt.target.dataset?.['inputSlot'] ?? '_'
+  const valueSegmentLeft = evt.target.value.slice(0, evt.data ? cursorStart : cursorStart - 1)
+  const valueSegmentRight = evt.target.value.slice(evt.data ? cursorEnd + 1 : cursorEnd)
+  const change = evt.data ?? ' '
+  const formattedRawInput = formatWithMask({
+    value: `${valueSegmentLeft}${change}${valueSegmentRight}`,
+    mask: inputMask,
+    inputSlotPattern
+  })
   evt.preventDefault()
 
-  // TODO integrate date library for smart date parsing & formatting (Intl native library can output locale-specific formats accurately, but can only parse date objects not strings)
-  // TODO done
-
-  const possiblyValidDate = dayjs(cleanedValue, recognizedDateFormats, true)
-  console.log('parsed', possiblyValidDate)
-  evt.target.value = possiblyValidDate?.isValid()
-    ? possiblyValidDate.format(inputFormat.value)
-    : cleanedValue
+  // use date library for smart date parsing & formatting (Intl native library can output locale-specific formats accurately, but can only parse date objects not strings)
+  evt.target.value = formatOutput(formattedRawInput)
   evt.target.dispatchEvent(new InputEvent('input'))
+
+  nextTick().then(() => {
+    const newCusorStart = evt.data ? cursorStart + 1 : cursorStart - 1
+    const newCusorEnd = evt.data ? cursorEnd + 1 : cursorEnd - 1
+    evt.target.setSelectionRange(newCusorStart, newCusorEnd)
+  })
 }
 
-function assertTarget(target: EventTarget): asserts target is HTMLInputElement {
-  if (!(target instanceof HTMLInputElement)) {
-    throw new Error('Target must be an HTMLInputElement')
+function formatWithMask(params: {
+  value: string
+  mask: string
+  inputSlotPattern: string
+  regex?: RegExp
+}): string {
+  const { value, mask, inputSlotPattern, regex = /^\d{1}$/ } = params
+  console.log('before mask', value)
+
+  const valueAsArray = value.split('')
+  valueAsArray.length = mask.length //remove trailing values
+  const replacedValuesArray = []
+  for (let i = 0; i < valueAsArray.length; i++) {
+    const item = valueAsArray[i]
+    const maskChar = mask[i]
+    const replacedValue =
+      maskChar !== inputSlotPattern ? maskChar : regex.test(item) ? item : inputSlotPattern
+    replacedValuesArray.push(replacedValue)
   }
+  const replacedValuesAsString = replacedValuesArray.join('')
+  return replacedValuesAsString
 }
 
-function cleanInput(value: string) {
-  const numbersOnly = value.replace(/[^0-9]/g, '')
-  const chunk1 = numbersOnly.slice(0, 2)
-  const chunk2 = numbersOnly.slice(2, 4)
-  const chunk3 = numbersOnly.slice(4, 8)
-  return `${chunk1 ? `${chunk1}/` : ''}${chunk2 ? `${chunk2}/` : ''}${chunk3}`
+// this can possiibly be refactored as a prop for custom final output formatting if other value types need support (e.g currencies etc)
+function formatOutput(value: string): string {
+  const possiblyValidDate = dayjs(value, recognizedDateFormats, true)
+  return possiblyValidDate.isValid() ? possiblyValidDate.format(inputFormat.value) : value
 }
 
 onMounted(() => {
+  // replace default locale with actual client locale
   locale.value = navigator.language
 })
 </script>
@@ -94,23 +133,34 @@ onMounted(() => {
 <style scoped>
 /* no sass to reduce dependencies of assignment since styling is minimal */
 .input-wrapper {
+  position: relative;
   width: 120px;
   height: 40px;
-  border-radius: 4px;
-  border: 1px solid gray;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: 5px;
 }
 .input-wrapper input {
   width: 100%;
   height: 100%;
+  padding: 5px;
+  display: block;
+  border-radius: 4px;
+  border: 1px solid gray;
   outline: none;
-  border: none;
 }
 input:invalid,
 input.invalid {
   border: 1px solid red;
+}
+
+.input-wrapper .mask-text {
+  position: absolute;
+  bottom: -16px;
+  left: 0;
+  margin-top: 16px;
+  color: gray;
+  font-size: 12px;
 }
 </style>

@@ -1,6 +1,6 @@
 <template>
   <main>
-    <form @submit.prevent="null" class="date-input-section">
+    <form ref="formElement" class="date-input-section" @submit.prevent="onFormSubmit">
       <DateInput v-model="date" />
       <div>
         <button type="submit">Submit</button>
@@ -12,8 +12,27 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import DateInput from './components/DateInput.vue'
+import { assertTarget, report } from './utils'
 
 const date = ref<string>('')
+
+function onFormSubmit(evt: Event) {
+  evt.preventDefault()
+  assertTarget(evt, HTMLFormElement)
+  const form = evt.target
+  const controls = form.elements
+
+  // here we do some simple validation checks.. just log to console
+  for (const control of controls) {
+    if (control instanceof HTMLInputElement) {
+      if (control.dataset.error?.length) {
+        report(`error: ${control.dataset.error}`)
+        return
+      }
+    }
+  }
+  report('form is valid!')
+}
 </script>
 
 <style scoped>
@@ -31,6 +50,7 @@ button[type='submit'] {
   margin-top: 20px;
   width: 100%;
   padding: 12px;
+  cursor: pointer;
   background: blanchedalmond;
   color: black;
   font-weight: 600;
