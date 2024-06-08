@@ -10,10 +10,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import DateInput from './components/DateInput.vue'
-import { assertTarget, report } from './utils'
-
 const date = ref<string>('')
 
 function onFormSubmit(evt: Event) {
