@@ -1,15 +1,12 @@
 export default defineNuxtConfig({
+    modules: [
+        '@nuxt/test-utils/module'
+    ],
     typescript: {
-        references: [
-            {
-                "path": "./tsconfig.node.json"
-            },
-            {
-                "path": "./tsconfig.app.json"
-            },
-            {
-                "path": "./tsconfig.vitest.json"
+        tsConfig: {
+            compilerOptions: {
+                types: ['vitest/globals']
             }
-        ]
+        }
     }
 })
