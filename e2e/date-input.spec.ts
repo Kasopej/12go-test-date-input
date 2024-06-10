@@ -18,7 +18,7 @@ test('has input element', async ({ page, baseURL }) => {
 });
 
 test('mask aligns with locale', async ({ page, baseURL }) => {
-  // en-GB configured in playwright.config.ts
+  // en-GB configured in playwright.config.ts (can be changed)
   await page.goto(baseURL + '/');
   const mask = page.locator('.mask-text').first();
 
@@ -28,7 +28,7 @@ test('mask aligns with locale', async ({ page, baseURL }) => {
 });
 
 test('input element autocorrects input if possible', async ({ page, baseURL }) => {
-  // en-GB configured in playwright.config.ts
+  // en-GB configured in playwright.config.ts (can be changed)
   await page.goto(baseURL + '/');
   const input = page.locator('input').first();
 
