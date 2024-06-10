@@ -8,6 +8,7 @@
       v-model="inputModel"
       :pattern="inputPattern"
       :placeholder="inputFormat"
+      data-testid="date-input"
       data-input-slot="_"
       data-error=""
       @beforeinput="onBeforeInput"
@@ -56,6 +57,8 @@ const inputMask = '__/__/____'
 const inputFormat = computed<DateFormat>(() => {
   return locale.value.toLowerCase() === 'en-us' ? 'MM/DD/YYYY' : 'DD/MM/YYYY'
 })
+
+// array of formats for auto-fixing if user enters in wrong format
 const recognizedDateFormats = ['MM/DD/YYYY', 'DD/MM/YYYY']
 const dateIsInvalid = computed(
   () => !!inputModel.value && !dayjs(inputModel.value, recognizedDateFormats, true).isValid()
